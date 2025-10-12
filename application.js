@@ -219,6 +219,11 @@ function createTabletCard(index) {
   nicknameBtn.type = "button";
   nicknameBtn.classList.add("span-2");
 
+  const adjustTimeBtn = document.createElement("button");
+  adjustTimeBtn.textContent = "Adjust Time";
+  adjustTimeBtn.type = "button";
+  adjustTimeBtn.classList.add("span-2");
+
   const syncDisplay = () => {
     heading.textContent = tablet.nickname ? `${tablet.nickname} (Tablet ${index + 1})` : `Tablet ${index + 1}`;
     occupantDisplay.textContent = tablet.occupant || "Available";
@@ -341,9 +346,35 @@ function createTabletCard(index) {
     saveAppState();
   });
 
+  adjustTimeBtn.addEventListener("click", () => {
+    if (tablet.status === "running") {
+      alert("Stop the timer before adjusting the time.");
+      return;
+    }
+    const currentMinutes = Math.floor((tablet.timeLeft || DEFAULT_SESSION_SECONDS) / 60);
+    const entry = window.prompt("Set minutes remaining (0-30):", String(currentMinutes));
+    if (entry === null) {
+      return;
+    }
+    const parsed = Number.parseInt(entry, 10);
+    if (Number.isNaN(parsed) || parsed < 0 || parsed > 30) {
+      alert("Enter a whole number between 0 and 30.");
+      return;
+    }
+    const seconds = parsed * 60;
+    tablet.timeLeft = seconds;
+    tablet.targetTime = null;
+    if (parsed === 0 && tablet.status === "running") {
+      tablet.status = "idle";
+    }
+    syncDisplay();
+    saveAppState();
+  });
+
   const controls = document.createElement("div");
   controls.className = "tablet-controls";
   controls.appendChild(nicknameBtn);
+  controls.appendChild(adjustTimeBtn);
   controls.appendChild(assignBtn);
   controls.appendChild(startBtn);
   controls.appendChild(stopBtn);
