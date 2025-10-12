@@ -1,7 +1,7 @@
 body {
     margin: 0;
     font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #eef2f7;
+    background-color: #000000;
     color: #2c3e50;
 }
 
@@ -43,7 +43,7 @@ button:active {
     justify-content: center;
     align-items: center;
     text-align: center;
-    background-color: white;
+    background-color: rgb(96, 162, 185);
     padding: 32px 36px;
     border-radius: 14px;
     box-shadow: 0 14px 36px rgba(52, 152, 219, 0.18);
