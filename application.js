@@ -186,7 +186,6 @@ function createTabletCard(index) {
   card.className = "tablet-device";
 
   const heading = document.createElement("h3");
-  heading.textContent = `Tablet ${index + 1}`;
 
   const occupantDisplay = document.createElement("p");
   occupantDisplay.className = "tablet-occupant";
@@ -215,7 +214,13 @@ function createTabletCard(index) {
   clearBtn.textContent = "Clear";
   clearBtn.type = "button";
 
+  const nicknameBtn = document.createElement("button");
+  nicknameBtn.textContent = "Nickname";
+  nicknameBtn.type = "button";
+  nicknameBtn.classList.add("span-2");
+
   const syncDisplay = () => {
+    heading.textContent = tablet.nickname ? `${tablet.nickname} (Tablet ${index + 1})` : `Tablet ${index + 1}`;
     occupantDisplay.textContent = tablet.occupant || "Available";
     const remaining = computeRemainingSeconds(tablet);
     updateTimerDisplay(timerDisplay, remaining);
@@ -324,8 +329,21 @@ function createTabletCard(index) {
     saveAppState();
   });
 
+  nicknameBtn.addEventListener("click", () => {
+    const currentNickname = tablet.nickname || "";
+    const value = window.prompt("Nickname for this tablet:", currentNickname);
+    if (value === null) {
+      return;
+    }
+    const trimmed = value.trim();
+    tablet.nickname = trimmed.length > 0 ? trimmed : null;
+    syncDisplay();
+    saveAppState();
+  });
+
   const controls = document.createElement("div");
   controls.className = "tablet-controls";
+  controls.appendChild(nicknameBtn);
   controls.appendChild(assignBtn);
   controls.appendChild(startBtn);
   controls.appendChild(stopBtn);
@@ -375,6 +393,10 @@ function ensureTabletStates(deviceCount) {
   if (!Array.isArray(appState.tablets)) {
     appState.tablets = [];
   }
+  appState.tablets = appState.tablets.map((tablet) => ({
+    ...createDefaultTabletState(),
+    ...tablet,
+  }));
   while (appState.tablets.length < deviceCount) {
     appState.tablets.push(createDefaultTabletState());
   }
@@ -390,6 +412,7 @@ function createDefaultTabletState() {
     status: "idle",
     timeLeft: DEFAULT_SESSION_SECONDS,
     targetTime: null,
+    nickname: null,
   };
 }
 
