@@ -76,7 +76,7 @@ function showTabletView(deviceCount, options = {}) {
   container.className = "tablet-view";
 
   const heading = document.createElement("h2");
-  heading.textContent = "Tablet view";
+  heading.textContent = `Showing ${deviceCount} Devices`;
   container.appendChild(heading);
 
   const queueSection = setupQueueSection();
