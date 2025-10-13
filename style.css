@@ -93,6 +93,17 @@ button:active {
     margin-bottom: 14px;
 }
 
+.nameless-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.nameless-toggle input {
+    margin: 0;
+}
+
 .queue-header h3 {
     margin: 0;
     font-size: 20px;
@@ -124,6 +135,25 @@ button:active {
     background-color: #f7f9fc;
     border-radius: 6px;
     padding: 7px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.queue-name {
+    flex: 1;
+    overflow-wrap: anywhere;
+}
+
+.queue-remove {
+    background-color: #e74c3c;
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.queue-remove:hover {
+    background-color: #c0392b;
 }
 
 .queue-empty {

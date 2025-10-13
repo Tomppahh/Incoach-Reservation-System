@@ -8,10 +8,61 @@ let queueEmptyMessage = null;
 let appState = {
   deviceCount: null,
   queue: [],
+  returnedQueue: [],
   tablets: [],
   view: "welcome",
+  namelessMode: false,
 };
 const timerIntervals = new Map();
+
+function ensureQueueState() {
+  if (!Array.isArray(appState.queue)) {
+    appState.queue = [];
+  }
+  if (!Array.isArray(appState.returnedQueue)) {
+    appState.returnedQueue = [];
+  }
+}
+
+function getTotalQueueLength() {
+  ensureQueueState();
+  return appState.queue.length + appState.returnedQueue.length;
+}
+
+function hasQueueEntries() {
+  return getTotalQueueLength() > 0;
+}
+
+function takeNextQueueName() {
+  ensureQueueState();
+  if (appState.returnedQueue.length > 0) {
+    return appState.returnedQueue.shift();
+  }
+  return appState.queue.shift();
+}
+
+function addReturnedName(name) {
+  if (!name) {
+    return;
+  }
+  ensureQueueState();
+  appState.returnedQueue.unshift(name);
+}
+
+function removeQueueEntry(source, index) {
+  ensureQueueState();
+  if (source === "returned") {
+    if (index >= 0 && index < appState.returnedQueue.length) {
+      appState.returnedQueue.splice(index, 1);
+    }
+    return;
+  }
+  if (source === "queue") {
+    if (index >= 0 && index < appState.queue.length) {
+      appState.queue.splice(index, 1);
+    }
+  }
+}
 
 function main() {
   mainElement = document.querySelector("main");
@@ -19,6 +70,7 @@ function main() {
 
   const storedState = loadAppState();
   appState = { ...appState, ...storedState };
+  ensureQueueState();
 
   if (appState.view === "tablet" && typeof appState.deviceCount === "number") {
     showTabletView(appState.deviceCount, { skipSave: true });
@@ -62,6 +114,16 @@ function handleConfirm(event) {
   appState.view = "tablet";
   ensureTabletStates(deviceCount);
   showTabletView(deviceCount);
+}
+
+function getOccupantLabel(tablet) {
+  if (tablet.occupant) {
+    return tablet.occupant;
+  }
+  if (tablet.namelessSessionActive) {
+    return "-";
+  }
+  return "Available";
 }
 
 function showTabletView(deviceCount, options = {}) {
@@ -116,6 +178,26 @@ function setupQueueSection() {
   title.textContent = "Waiting Queue";
   header.appendChild(title);
 
+  const namelessToggleLabel = document.createElement("label");
+  namelessToggleLabel.className = "nameless-toggle";
+
+  const namelessToggle = document.createElement("input");
+  namelessToggle.type = "checkbox";
+  namelessToggle.checked = Boolean(appState.namelessMode);
+
+  namelessToggle.addEventListener("change", () => {
+    appState.namelessMode = namelessToggle.checked;
+    saveAppState();
+    refreshNamelessDisplays();
+  });
+
+  const namelessToggleText = document.createElement("span");
+  namelessToggleText.textContent = "Use Tablets without names";
+
+  namelessToggleLabel.appendChild(namelessToggle);
+  namelessToggleLabel.appendChild(namelessToggleText);
+  header.appendChild(namelessToggleLabel);
+
   const form = document.createElement("form");
   form.className = "queue-form";
 
@@ -164,17 +246,56 @@ function renderQueueList() {
   if (!queueListElement || !queueEmptyMessage) {
     return;
   }
+  ensureQueueState();
   queueListElement.innerHTML = "";
-  if (!appState.queue || appState.queue.length === 0) {
+  if (!hasQueueEntries()) {
     queueEmptyMessage.style.display = "block";
     return;
   }
 
   queueEmptyMessage.style.display = "none";
 
-  appState.queue.forEach((name) => {
+  appState.returnedQueue.forEach((name, index) => {
     const li = document.createElement("li");
-    li.textContent = name;
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "queue-name";
+    nameSpan.textContent = name;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "queue-remove";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => {
+      removeQueueEntry("returned", index);
+      saveAppState();
+      renderQueueList();
+    });
+
+    li.appendChild(nameSpan);
+    li.appendChild(removeBtn);
+    queueListElement.appendChild(li);
+  });
+
+  appState.queue.forEach((name, index) => {
+    const li = document.createElement("li");
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "queue-name";
+    nameSpan.textContent = name;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "queue-remove";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => {
+      removeQueueEntry("queue", index);
+      saveAppState();
+      renderQueueList();
+    });
+
+    li.appendChild(nameSpan);
+    li.appendChild(removeBtn);
     queueListElement.appendChild(li);
   });
 }
@@ -184,6 +305,7 @@ function createTabletCard(index) {
 
   const card = document.createElement("div");
   card.className = "tablet-device";
+  card.dataset.index = String(index);
 
   const heading = document.createElement("h3");
 
@@ -226,7 +348,7 @@ function createTabletCard(index) {
 
   const syncDisplay = () => {
     heading.textContent = tablet.nickname ? `${tablet.nickname} (Tablet ${index + 1})` : `Tablet ${index + 1}`;
-    occupantDisplay.textContent = tablet.occupant || "Available";
+    occupantDisplay.textContent = getOccupantLabel(tablet);
     const remaining = computeRemainingSeconds(tablet);
     updateTimerDisplay(timerDisplay, remaining);
   };
@@ -243,6 +365,7 @@ function createTabletCard(index) {
         tablet.status = "idle";
         tablet.timeLeft = 0;
         tablet.targetTime = null;
+        tablet.namelessSessionActive = false;
         saveAppState();
       }
     }, 1000);
@@ -262,14 +385,15 @@ function createTabletCard(index) {
       alert("This tablet is already in use.");
       return;
     }
-    if (!appState.queue || appState.queue.length === 0) {
+    if (!hasQueueEntries()) {
       alert("The queue is empty.");
       return;
     }
     stopInterval();
-    tablet.occupant = appState.queue.shift();
+    tablet.occupant = takeNextQueueName();
     tablet.status = "idle";
     tablet.lastClearedName = null;
+    tablet.namelessSessionActive = false;
     tablet.timeLeft = DEFAULT_SESSION_SECONDS;
     tablet.targetTime = null;
     renderQueueList();
@@ -278,7 +402,7 @@ function createTabletCard(index) {
   });
 
   startBtn.addEventListener("click", () => {
-    if (!tablet.occupant) {
+    if (!tablet.occupant && !appState.namelessMode) {
       alert("Assign someone to this tablet first.");
       return;
     }
@@ -287,6 +411,10 @@ function createTabletCard(index) {
     }
     const baseline = tablet.timeLeft && tablet.timeLeft > 0 ? tablet.timeLeft : DEFAULT_SESSION_SECONDS;
     tablet.status = "running";
+    tablet.namelessSessionActive = !tablet.occupant;
+    if (!tablet.occupant) {
+      tablet.lastClearedName = null;
+    }
     tablet.timeLeft = baseline;
     tablet.targetTime = Date.now() + baseline * 1000;
     syncDisplay();
@@ -311,20 +439,22 @@ function createTabletCard(index) {
     stopInterval();
     const returningName = tablet.occupant || tablet.lastClearedName;
     if (returningName) {
-      appState.queue.unshift(returningName);
-      renderQueueList();
+      addReturnedName(returningName);
     }
+    renderQueueList();
     tablet.occupant = null;
     tablet.lastClearedName = null;
     tablet.status = "idle";
     tablet.timeLeft = DEFAULT_SESSION_SECONDS;
     tablet.targetTime = null;
+    tablet.namelessSessionActive = false;
     syncDisplay();
     saveAppState();
   });
 
   clearBtn.addEventListener("click", () => {
     stopInterval();
+    tablet.namelessSessionActive = false;
     tablet.lastClearedName = tablet.occupant;
     tablet.occupant = null;
     tablet.status = "idle";
@@ -336,6 +466,7 @@ function createTabletCard(index) {
 
   nicknameBtn.addEventListener("click", () => {
     const currentNickname = tablet.nickname || "";
+    tablet.namelessSessionActive = false;
     const value = window.prompt("Nickname for this tablet:", currentNickname);
     if (value === null) {
       return;
@@ -367,6 +498,9 @@ function createTabletCard(index) {
     if (parsed === 0 && tablet.status === "running") {
       tablet.status = "idle";
     }
+    if (seconds === 0) {
+      tablet.namelessSessionActive = false;
+    }
     syncDisplay();
     saveAppState();
   });
@@ -396,6 +530,24 @@ function createTabletCard(index) {
   }
 
   return card;
+}
+
+function refreshNamelessDisplays() {
+  const cards = mainElement ? mainElement.querySelectorAll(".tablet-device") : [];
+  cards.forEach((card) => {
+    const index = Number.parseInt(card.dataset.index, 10);
+    if (Number.isNaN(index)) {
+      return;
+    }
+    const tablet = appState.tablets[index];
+    if (!tablet) {
+      return;
+    }
+    const occupantDisplayElement = card.querySelector(".tablet-occupant");
+    if (occupantDisplayElement) {
+      occupantDisplayElement.textContent = getOccupantLabel(tablet);
+    }
+  });
 }
 
 function computeRemainingSeconds(tablet) {
@@ -444,6 +596,7 @@ function createDefaultTabletState() {
     timeLeft: DEFAULT_SESSION_SECONDS,
     targetTime: null,
     nickname: null,
+    namelessSessionActive: false,
   };
 }
 
