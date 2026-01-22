@@ -1,5 +1,5 @@
 // test comment
-const APP_STORAGE_KEY = "incoachAppStateV1";
+const APP_STORAGE_KEY = "PUBLIC_STORAGE_KEY";
 const DEFAULT_SESSION_SECONDS = 30 * 60;
 let mainElement = null;
 let initialMarkup = null;
